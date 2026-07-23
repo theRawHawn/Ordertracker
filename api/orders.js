@@ -62,11 +62,22 @@ export default async function handler(req, res) {
 
     const sheets = google.sheets({ version: 'v4', auth });
 
+    // Dynamically retrieve the first sheet tab name (e.g. "Orders", "Sheet1", etc.)
+    let sheetTitle = 'Orders';
+    try {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      if (meta.data.sheets && meta.data.sheets.length > 0) {
+        sheetTitle = meta.data.sheets[0].properties?.title || 'Orders';
+      }
+    } catch (metaErr) {
+      console.warn('Could not fetch sheet metadata, defaulting tab title to "Orders":', metaErr?.message);
+    }
+
     if (req.method === 'GET') {
       // Fetch orders from Google Sheet
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: 'Orders!A2:M',
+        range: `'${sheetTitle}'!A2:M`,
       });
 
       const rows = response.data.values || [];
@@ -107,14 +118,14 @@ export default async function handler(req, res) {
             {
               id: `log-${Date.now()}`,
               timestamp: new Date().toISOString(),
-              note: 'Loaded via Vercel Google API Backend',
+              note: 'Loaded via Google Sheet Sync',
               updatedBy: 'Google Sheets API',
             },
           ],
         };
       });
 
-      return res.status(200).json({ configured: true, orders, rawRowsCount: rows.length });
+      return res.status(200).json({ configured: true, orders, rawRowsCount: rows.length, sheetTitle });
     }
 
     if (req.method === 'POST' || req.method === 'PUT') {
@@ -147,24 +158,28 @@ export default async function handler(req, res) {
       });
 
       // Clear range first
-      await sheets.spreadsheets.values.clear({
-        spreadsheetId,
-        range: 'Orders!A1:M1000',
-      });
+      try {
+        await sheets.spreadsheets.values.clear({
+          spreadsheetId,
+          range: `'${sheetTitle}'!A1:M1000`,
+        });
+      } catch (clearErr) {
+        console.warn('Clear range warning:', clearErr?.message);
+      }
 
       // Write new data
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `Orders!A1:M${rows.length}`,
+        range: `'${sheetTitle}'!A1:M${rows.length}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          range: `Orders!A1:M${rows.length}`,
+          range: `'${sheetTitle}'!A1:M${rows.length}`,
           majorDimension: 'ROWS',
           values: rows,
         },
       });
 
-      return res.status(200).json({ success: true, count: listToSave.length });
+      return res.status(200).json({ success: true, count: listToSave.length, sheetTitle });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
