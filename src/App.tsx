@@ -31,6 +31,22 @@ import { OrderDetailModal } from './components/OrderDetailModal';
 import { QuotePreviewModal } from './components/QuotePreviewModal';
 import { TrashBinModal } from './components/TrashBinModal';
 
+// How often (ms) to pull the latest data from Google Sheets in the background.
+const SHEET_POLL_INTERVAL_MS = 20000;
+
+// Compares two order lists while ignoring `deliveryLogs`, since
+// fetchOrdersFromGoogleSheet/fetchPublicGoogleSheet stamp a fresh
+// "Loaded from synchronized Google Sheet" log entry on every call —
+// without this, a poll tick would look like a change even when
+// nothing in the sheet actually changed.
+function areOrdersEquivalent(a: PurchaseOrder[], b: PurchaseOrder[]): boolean {
+  const strip = (list: PurchaseOrder[]) =>
+    [...list]
+      .sort((x, y) => x.id.localeCompare(y.id))
+      .map(({ deliveryLogs, ...rest }) => rest);
+  return JSON.stringify(strip(a)) === JSON.stringify(strip(b));
+}
+
 export default function App() {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => getStoredAuth());
@@ -65,6 +81,23 @@ export default function App() {
   const [quotePreview, setQuotePreview] = useState<{ url: string; vendorName: string } | null>(
     null
   );
+
+  // Refs used so the background poll always reads the latest values
+  // without needing to restart its interval on every state change.
+  const ordersRef = useRef(orders);
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  const sheetSyncStatusRef = useRef(sheetSyncStatus);
+  useEffect(() => {
+    sheetSyncStatusRef.current = sheetSyncStatus;
+  }, [sheetSyncStatus]);
+
+  const isFormModalOpenRef = useRef(isFormModalOpen);
+  useEffect(() => {
+    isFormModalOpenRef.current = isFormModalOpen;
+  }, [isFormModalOpen]);
 
   // Initialize Firebase Auth listener & initial Sheet fetch
   useEffect(() => {
@@ -125,6 +158,41 @@ export default function App() {
   useEffect(() => {
     saveDeletedOrdersToStorage(deletedOrders);
   }, [deletedOrders]);
+
+  // Background polling: periodically pull the latest data from Google Sheets
+  // so changes made elsewhere (another device, tab, or teammate) show up
+  // without needing a manual "Load Orders from Google Sheet" click.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const poll = async () => {
+      // Skip a tick if the tab is backgrounded, a save is already in flight,
+      // or the user is actively editing an order — avoids clobbering work in progress.
+      if (document.visibilityState === 'hidden') return;
+      if (sheetSyncStatusRef.current === 'syncing') return;
+      if (isFormModalOpenRef.current) return;
+
+      const sheetId = getStoredSpreadsheetId();
+      if (!sheetId) return;
+
+      const token = getAccessToken();
+
+      try {
+        const fetched = token
+          ? await fetchOrdersFromGoogleSheet(token, sheetId)
+          : await fetchPublicGoogleSheet(sheetId);
+
+        if (fetched && !areOrdersEquivalent(fetched, ordersRef.current)) {
+          setOrders(fetched);
+        }
+      } catch (err) {
+        console.log('Background sheet poll error:', err);
+      }
+    };
+
+    const intervalId = setInterval(poll, SHEET_POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated]);
 
   // Auth Handlers
   const handleLoginSuccess = (readOnly: boolean) => {
