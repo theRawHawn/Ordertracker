@@ -35,7 +35,7 @@ export const getDriveEmbedUrl = (url: string): string => {
   return url;
 };
 
-const STORAGE_KEY = 'order_tracker_india_orders_v1';
+const STORAGE_KEY = 'order_tracker_clean_orders_v3';
 const AUTH_KEY = 'order_tracker_authenticated_v1';
 const READONLY_KEY = 'order_tracker_readonly_v1';
 const CREDS_KEY = 'order_tracker_credentials_v1';
@@ -102,19 +102,21 @@ export const setStoredReadOnly = (isReadOnly: boolean): void => {
   }
 };
 
-export const loadStoredOrders = (initialOrders: PurchaseOrder[]): PurchaseOrder[] => {
+export const loadStoredOrders = (initialOrders: PurchaseOrder[] = []): PurchaseOrder[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    if (stored !== null) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (o: any) => !['QT-2026-001', 'QT-2026-002', 'QT-2026-003', 'QT-2026-004'].includes(o?.id || o?.quoteNumber)
+        );
       }
     }
   } catch (err) {
     console.error('Failed to load orders from localStorage:', err);
   }
-  return initialOrders;
+  return initialOrders || [];
 };
 
 export const saveOrdersToStorage = (orders: PurchaseOrder[]): void => {
