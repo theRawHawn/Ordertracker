@@ -32,6 +32,7 @@ interface HeaderProps {
   syncStatus?: 'idle' | 'syncing' | 'saved' | 'error';
   deletedCount?: number;
   onOpenTrashBin?: () => void;
+  onOpenGoogleSheetSync?: () => void;
   onNewOrder: () => void;
   onImportData: (importedOrders: PurchaseOrder[]) => void;
   onLogout: () => void;
@@ -47,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   syncStatus = 'idle',
   deletedCount = 0,
   onOpenTrashBin,
+  onOpenGoogleSheetSync,
   onNewOrder,
   onImportData,
   onLogout,
@@ -125,6 +127,38 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 shrink-0 relative">
+            {/* Google Sheets Sync Button */}
+            {onOpenGoogleSheetSync && (
+              <button
+                onClick={onOpenGoogleSheetSync}
+                title="Sync & Connect Google Sheets Database"
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm border ${
+                  syncStatus === 'syncing'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : syncStatus === 'error'
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    : syncStatus === 'saved'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-500/40'
+                }`}
+              >
+                <FileSpreadsheet
+                  className={`w-3.5 h-3.5 ${
+                    syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-emerald-400'
+                  }`}
+                />
+                <span className="hidden sm:inline">
+                  {syncStatus === 'syncing'
+                    ? 'Syncing...'
+                    : syncStatus === 'saved'
+                    ? 'Synced'
+                    : syncStatus === 'error'
+                    ? 'Sync Error'
+                    : 'Sheets Sync'}
+                </span>
+              </button>
+            )}
+
             {!isReadOnly && (
               <>
                 {/* New Quote Button */}

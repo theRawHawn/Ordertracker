@@ -30,6 +30,7 @@ import { OrderFormModal } from './components/OrderFormModal';
 import { OrderDetailModal } from './components/OrderDetailModal';
 import { QuotePreviewModal } from './components/QuotePreviewModal';
 import { TrashBinModal } from './components/TrashBinModal';
+import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 
 // How often (ms) to pull the latest data from Google Sheets in the background.
 const SHEET_POLL_INTERVAL_MS = 20000;
@@ -62,6 +63,7 @@ export default function App() {
     loadStoredDeletedOrders()
   );
   const [isTrashBinOpen, setIsTrashBinOpen] = useState(false);
+  const [isGoogleSheetSyncOpen, setIsGoogleSheetSyncOpen] = useState(false);
 
   // Sync Status Indicator
   const [sheetSyncStatus, setSheetSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
@@ -99,33 +101,39 @@ export default function App() {
     isFormModalOpenRef.current = isFormModalOpen;
   }, [isFormModalOpen]);
 
-  // Initialize Firebase Auth listener & initial Sheet fetch
+  // Initialize Auth & initial Sheet fetch
   useEffect(() => {
     initAuth();
 
-    // Auto-fetch latest Google Sheet DB if spreadsheet ID exists
-    const sheetId = getStoredSpreadsheetId();
-    const token = getAccessToken();
+    // 1. First try Vercel Serverless Function /api/orders
+    fetch('/api/orders')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.configured && Array.isArray(data.orders) && data.orders.length > 0) {
+          setOrders(data.orders);
+          return;
+        }
+        // 2. Fallback to stored Google Sheet ID via client OAuth or public sheet link
+        const sheetId = getStoredSpreadsheetId();
+        const token = getAccessToken();
 
-    if (sheetId) {
-      if (token) {
-        fetchOrdersFromGoogleSheet(token, sheetId)
-          .then((fetched) => {
-            if (fetched && fetched.length > 0) {
-              setOrders(fetched);
-            }
-          })
-          .catch((err) => console.log('Auto fetch sheet error:', err));
-      } else {
-        fetchPublicGoogleSheet(sheetId)
-          .then((fetched) => {
-            if (fetched && fetched.length > 0) {
-              setOrders(fetched);
-            }
-          })
-          .catch((err) => console.log('Public sheet auto fetch error:', err));
-      }
-    }
+        if (sheetId) {
+          if (token) {
+            fetchOrdersFromGoogleSheet(token, sheetId)
+              .then((fetched) => {
+                if (fetched && fetched.length > 0) setOrders(fetched);
+              })
+              .catch((err) => console.log('Auto fetch client sheet error:', err));
+          } else {
+            fetchPublicGoogleSheet(sheetId)
+              .then((fetched) => {
+                if (fetched && fetched.length > 0) setOrders(fetched);
+              })
+              .catch((err) => console.log('Public sheet auto fetch error:', err));
+          }
+        }
+      })
+      .catch((err) => console.log('Vercel API fetch error:', err));
   }, []);
 
   // Save to LocalStorage & auto-save to Google Sheet DB whenever orders change
@@ -137,21 +145,53 @@ export default function App() {
       return;
     }
 
+    if (isReadOnly) return;
+
     const token = getAccessToken();
     const sheetId = getStoredSpreadsheetId();
 
-    if (token && sheetId && !isReadOnly) {
+    const syncToSheets = async () => {
       setSheetSyncStatus('syncing');
-      saveOrdersToGoogleSheet(token, sheetId, orders)
-        .then(() => {
-          setSheetSyncStatus('saved');
-          setTimeout(() => setSheetSyncStatus('idle'), 3000);
-        })
-        .catch((err) => {
-          console.error('Auto save error:', err);
-          setSheetSyncStatus('error');
+      let success = false;
+
+      // Try Vercel Serverless API first
+      try {
+        const vercelRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'saveAll', orders }),
         });
-    }
+        if (vercelRes.ok) {
+          const resData = await vercelRes.json();
+          if (resData.success) {
+            success = true;
+          }
+        }
+      } catch (err) {
+        // Vercel API not configured or offline
+      }
+
+      // If Vercel API did not handle it, try Client-side Google Sheets OAuth
+      if (!success && token && sheetId) {
+        try {
+          await saveOrdersToGoogleSheet(token, sheetId, orders);
+          success = true;
+        } catch (err) {
+          console.error('Client Google Sheet save error:', err);
+        }
+      }
+
+      if (success) {
+        setSheetSyncStatus('saved');
+        setTimeout(() => setSheetSyncStatus('idle'), 3000);
+      } else if (token && sheetId) {
+        setSheetSyncStatus('error');
+      } else {
+        setSheetSyncStatus('idle');
+      }
+    };
+
+    syncToSheets();
   }, [orders, isReadOnly]);
 
   // Persist Trash Bin items to local storage
@@ -374,7 +414,9 @@ export default function App() {
       order.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.quoteNumber || order.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.bankDetails?.bankName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.bankDetails?.ifscCode || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (order.bankDetails?.accountNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.bankDetails?.ifscCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.amount ? order.amount.toString() : '').includes(searchTerm);
 
     const matchesStatus =
       selectedStatus === 'ALL' ? true : order.status === selectedStatus;
@@ -396,6 +438,7 @@ export default function App() {
         syncStatus={sheetSyncStatus}
         deletedCount={deletedOrders.length}
         onOpenTrashBin={() => setIsTrashBinOpen(true)}
+        onOpenGoogleSheetSync={() => setIsGoogleSheetSyncOpen(true)}
         onNewOrder={() => {
           if (isReadOnly) return;
           setEditingOrder(null);
@@ -478,6 +521,13 @@ export default function App() {
         onPermanentDeleteOrder={handlePermanentDeleteOrder}
         onEmptyTrash={handleEmptyTrash}
         isReadOnly={isReadOnly}
+      />
+
+      <GoogleSheetSyncModal
+        isOpen={isGoogleSheetSyncOpen}
+        onClose={() => setIsGoogleSheetSyncOpen(false)}
+        orders={orders}
+        onSyncOrdersFromSheet={(sheetOrders) => setOrders(sheetOrders)}
       />
     </div>
   );

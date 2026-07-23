@@ -15,7 +15,13 @@ export const formatINR = (amount: number): string => {
 export const formatDate = (dateString?: string): string => {
   if (!dateString) return 'N/A';
   try {
-    const date = new Date(dateString);
+    let date: Date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    } else {
+      date = new Date(dateString);
+    }
     if (isNaN(date.getTime())) return dateString;
     return new Intl.DateTimeFormat('en-IN', {
       day: '2-digit',
@@ -107,10 +113,8 @@ export const loadStoredOrders = (initialOrders: PurchaseOrder[] = []): PurchaseO
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored !== null) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(
-          (o: any) => !['QT-2026-001', 'QT-2026-002', 'QT-2026-003', 'QT-2026-004'].includes(o?.id || o?.quoteNumber)
-        );
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
       }
     }
   } catch (err) {
