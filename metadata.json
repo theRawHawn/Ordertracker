@@ -1,0 +1,6 @@
+{
+  "name": "Order Tracker",
+  "description": "Centralized purchase order management and real-time delivery tracking system for small businesses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
