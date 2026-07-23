@@ -33,6 +33,8 @@ import { OrderDetailModal } from './components/OrderDetailModal';
 import { QuotePreviewModal } from './components/QuotePreviewModal';
 import { TrashBinModal } from './components/TrashBinModal';
 
+import { triggerBirthdayBurst } from './utils/confetti';
+
 // How often (ms) to pull the latest data from Google Sheets in the background.
 const SHEET_POLL_INTERVAL_MS = 20000;
 
@@ -355,6 +357,10 @@ export default function App() {
 
   // Order / Quote CRUD Handlers
   const handleCreateOrUpdateOrder = (orderData: Partial<PurchaseOrder>) => {
+    if (orderData.status === 'Order Placed' || orderData.status === 'Delivered') {
+      triggerBirthdayBurst();
+    }
+
     if (editingOrder) {
       // Edit existing
       setOrders((prev) =>
@@ -442,6 +448,10 @@ export default function App() {
   };
 
   const handleStatusChange = (id: string, newStatus: OrderStatus) => {
+    if (newStatus === 'Order Placed' || newStatus === 'Delivered') {
+      triggerBirthdayBurst();
+    }
+
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === id) {
