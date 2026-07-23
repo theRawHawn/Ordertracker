@@ -19,7 +19,6 @@ import {
 import { BrandLogo } from './BrandLogo';
 import { BRAND_CONFIG } from '../config/brandConfig';
 import { PurchaseOrder } from '../types';
-import { GoogleSheetSyncModal } from './GoogleSheetSyncModal';
 import {
   exportOrdersJSON,
   exportOrdersExcel,
@@ -58,7 +57,6 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [isGoogleSheetModalOpen, setIsGoogleSheetModalOpen] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -142,25 +140,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Add</span>
               </button>
             )}
-
-            {/* Google Sheet DB Status Button */}
-            <button
-              onClick={() => setIsGoogleSheetModalOpen(true)}
-              title="Manage Google Sheet Database connection and live settings"
-              className="py-1.5 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">
-                {syncStatus === 'syncing'
-                  ? 'Saving to Sheet DB...'
-                  : syncStatus === 'saved'
-                  ? 'Saved to Sheet DB ✓'
-                  : 'Google Sheet DB'}
-              </span>
-              <span className="sm:hidden">
-                {syncStatus === 'syncing' ? 'Saving...' : 'Sheet DB'}
-              </span>
-            </button>
 
             {/* Trash Bin / Backup Button */}
             {onOpenTrashBin && (
@@ -297,14 +276,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Google Sheet Sync Modal */}
-      <GoogleSheetSyncModal
-        isOpen={isGoogleSheetModalOpen}
-        onClose={() => setIsGoogleSheetModalOpen(false)}
-        orders={orders}
-        onSyncOrdersFromSheet={onImportData}
-      />
     </header>
   );
 };
