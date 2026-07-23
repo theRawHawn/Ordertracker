@@ -13,10 +13,12 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 }) => {
   const [customLogo, setCustomLogo] = useState<string>(() => {
     try {
-      return localStorage.getItem('brand_custom_logo_v1') || BRAND_CONFIG.logoUrl || '';
+      const stored = localStorage.getItem('brand_custom_logo_v1');
+      if (stored) return stored;
     } catch {
-      return BRAND_CONFIG.logoUrl || '';
+      // fallback
     }
+    return BRAND_CONFIG.logoUrl || '';
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);

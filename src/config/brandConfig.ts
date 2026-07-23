@@ -1,10 +1,8 @@
 /**
  * Brand & Logo Configuration
  * 
- * To display your own custom company brand logo when deploying:
- * 1. Set `logoUrl` below to your logo image URL or relative file path (e.g., '/brand-logo.png' or 'https://yourdomain.com/logo.png').
- * 2. Or place your logo image in the `/public/` directory (e.g. `/public/brand-logo.png`) and set `logoUrl: '/brand-logo.png'`.
- * 3. If `logoUrl` is empty (''), a Brand Logo Placeholder box will be shown, allowing quick image upload and preview.
+ * To set your permanent logo in the navbar:
+ * Replace the `logoUrl` string below with your PNG image link or relative path (e.g., 'https://yourdomain.com/logo.png' or '/logo.png').
  */
 
 export const BRAND_CONFIG = {
@@ -15,8 +13,9 @@ export const BRAND_CONFIG = {
   appTitle: 'Order Tracker',
 
   /** 
-   * Brand Logo URL or Image Path 
-   * Example: '/brand-logo.png' or 'https://example.com/logo.png' or base64 string
+   * Permanent Brand Logo Image URL / Path (PNG, SVG, JPG, etc.)
+   * PASTE YOUR PNG IMAGE HREF / URL HERE:
    */
-  logoUrl: '',
+  logoUrl: 'https://placehold.co/120x120/1e293b/f59e0b?text=LOGO', // <-- Replace with your PNG image URL or path
 };
+
