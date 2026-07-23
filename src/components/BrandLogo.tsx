@@ -5,11 +5,13 @@ import { BRAND_CONFIG } from '../config/brandConfig';
 interface BrandLogoProps {
   size?: 'sm' | 'md' | 'lg';
   showUploadOption?: boolean;
+  showTextButton?: boolean;
 }
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   size = 'md',
   showUploadOption = true,
+  showTextButton = false,
 }) => {
   const [customLogo, setCustomLogo] = useState<string>(() => {
     try {
@@ -18,11 +20,12 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     } catch {
       // fallback
     }
-    return BRAND_CONFIG.logoUrl || '';
+    return BRAND_CONFIG.logoUrl || '/logo.png';
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -54,8 +57,21 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const handleApplyUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput.trim()) return;
+    setCustomLogo(urlInput.trim());
+    try {
+      localStorage.setItem('brand_custom_logo_v1', urlInput.trim());
+    } catch (err) {
+      console.error('Failed to save logo to localStorage:', err);
+    }
+    setUrlInput('');
+    setIsModalOpen(false);
+  };
+
   const handleResetLogo = () => {
-    setCustomLogo(BRAND_CONFIG.logoUrl || '');
+    setCustomLogo(BRAND_CONFIG.logoUrl || '/logo.png');
     try {
       localStorage.removeItem('brand_custom_logo_v1');
     } catch (err) {
@@ -75,50 +91,69 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 
   return (
     <>
-      <div className="relative group inline-block">
-        {logoSrc && !hasError ? (
-          <div
-            onClick={() => showUploadOption && setIsModalOpen(true)}
-            className={`${dimensions.container} ${dimensions.rounded} bg-white border border-slate-200 overflow-hidden flex items-center justify-center p-1 shadow-md transition-all ${
-              showUploadOption ? 'cursor-pointer hover:border-amber-500 hover:ring-2 hover:ring-amber-500/30' : ''
-            }`}
-            title={showUploadOption ? 'Click to manage/replace Brand Logo' : 'Brand Logo'}
-          >
-            <img
-              src={logoSrc}
-              alt="Brand Logo"
-              onError={() => setHasError(true)}
-              className="w-full h-full object-contain"
-            />
-          </div>
-        ) : (
-          /* Brand Logo Placeholder Box */
-          <div
-            onClick={() => showUploadOption && setIsModalOpen(true)}
-            className={`${dimensions.container} ${dimensions.rounded} bg-gradient-to-tr from-amber-500 via-orange-500 to-emerald-600 p-0.5 shadow-md transition-all ${
-              showUploadOption ? 'cursor-pointer hover:scale-105' : ''
-            }`}
-            title="Brand Logo Placeholder • Click to upload custom logo or view instructions"
-          >
-            <div className={`w-full h-full bg-white ${dimensions.rounded} flex flex-col items-center justify-center relative overflow-hidden transition-colors`}>
-              <div className="relative flex items-center justify-center">
-                <Building2 className={`${dimensions.icon} text-amber-600`} />
-              </div>
-
-              {/* Hover badge for upload hint */}
+      <div className="flex items-center gap-2">
+        <div className="relative group inline-block">
+          {logoSrc && !hasError ? (
+            <div
+              onClick={() => showUploadOption && setIsModalOpen(true)}
+              className={`${dimensions.container} ${dimensions.rounded} bg-white border border-slate-200 overflow-hidden flex items-center justify-center p-1 shadow-md transition-all ${
+                showUploadOption ? 'cursor-pointer hover:border-amber-500 hover:ring-2 hover:ring-amber-500/30' : ''
+              }`}
+              title={showUploadOption ? 'Click to upload or manage Brand Logo' : 'Brand Logo'}
+            >
+              <img
+                src={logoSrc}
+                alt="Brand Logo"
+                onError={() => setHasError(true)}
+                className="w-full h-full object-contain"
+              />
               {showUploadOption && (
-                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-amber-300">
+                <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-amber-300 rounded-xl">
                   <Upload className="w-4 h-4" />
                 </div>
               )}
             </div>
-          </div>
+          ) : (
+            /* Brand Logo Placeholder Box */
+            <div
+              onClick={() => showUploadOption && setIsModalOpen(true)}
+              className={`${dimensions.container} ${dimensions.rounded} bg-gradient-to-tr from-amber-500 via-orange-500 to-emerald-600 p-0.5 shadow-md transition-all ${
+                showUploadOption ? 'cursor-pointer hover:scale-105' : ''
+              }`}
+              title="Brand Logo • Click to upload custom logo"
+            >
+              <div className={`w-full h-full bg-slate-900 ${dimensions.rounded} flex flex-col items-center justify-center relative overflow-hidden transition-colors`}>
+                <div className="relative flex items-center justify-center">
+                  <Building2 className={`${dimensions.icon} text-amber-400`} />
+                </div>
+
+                {/* Hover badge for upload hint */}
+                {showUploadOption && (
+                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-amber-300">
+                    <Upload className="w-4 h-4" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Optional text button next to logo */}
+        {showTextButton && showUploadOption && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            title="Upload or change brand logo image"
+          >
+            <Upload className="w-3.5 h-3.5 text-amber-400" />
+            <span>Upload Logo</span>
+          </button>
         )}
       </div>
 
       {/* Modal for Brand Logo Upload & Config Guide */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-slate-100">
             <button
               onClick={() => setIsModalOpen(false)}
@@ -132,28 +167,28 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
                 <ImageIcon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-base">Brand Logo Management</h3>
-                <p className="text-xs text-slate-400">Configure logo for deployment or preview</p>
+                <h3 className="font-bold text-white text-base">Upload & Manage Brand Logo</h3>
+                <p className="text-xs text-slate-400">Choose an image file from your computer or paste an image URL</p>
               </div>
             </div>
 
             {/* Current Logo Preview */}
-            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 mb-5 text-center">
-              <p className="text-xs font-semibold text-slate-300 mb-2">Current Active Logo</p>
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 mb-4 text-center">
+              <p className="text-xs font-semibold text-slate-300 mb-2">Logo Preview</p>
               <div className="flex justify-center mb-3">
-                {customLogo ? (
-                  <div className="w-24 h-24 rounded-xl bg-white border border-slate-300 p-2 flex items-center justify-center shadow-inner">
+                {customLogo && !hasError ? (
+                  <div className="w-28 h-28 rounded-xl bg-white border border-slate-300 p-2 flex items-center justify-center shadow-inner">
                     <img src={customLogo} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
                   </div>
                 ) : (
-                  <div className="w-24 h-24 rounded-xl bg-white border-2 border-dashed border-amber-500/60 p-2 flex flex-col items-center justify-center text-amber-600 shadow-inner">
+                  <div className="w-28 h-28 rounded-xl bg-slate-900 border-2 border-dashed border-amber-500/60 p-2 flex flex-col items-center justify-center text-amber-400 shadow-inner">
                     <Building2 className="w-8 h-8 mb-1" />
-                    <span className="text-[9px] font-bold tracking-wider uppercase">Placeholder</span>
+                    <span className="text-[9px] font-bold tracking-wider uppercase text-amber-400">No Logo Loaded</span>
                   </div>
                 )}
               </div>
 
-              {/* Upload Button */}
+              {/* Upload File Input */}
               <input
                 type="file"
                 ref={fileInputRef}
@@ -161,20 +196,21 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
                 accept="image/*"
                 className="hidden"
               />
+
               <div className="flex items-center justify-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md"
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Custom Logo</span>
+                  <Upload className="w-4 h-4" />
+                  <span>Choose Image File...</span>
                 </button>
                 {customLogo && (
                   <button
                     type="button"
                     onClick={handleResetLogo}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Reset</span>
@@ -183,27 +219,45 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
               </div>
             </div>
 
-            {/* Code Config Instructions */}
-            <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 text-xs text-slate-400 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-amber-300 font-semibold text-[11px]">
+            {/* URL Input Option */}
+            <form onSubmit={handleApplyUrl} className="mb-4">
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                Or enter image URL:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://example.com/logo.png"
+                  className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!urlInput.trim()}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  Apply
+                </button>
+              </div>
+            </form>
+
+            {/* Permanent repo guide */}
+            <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1">
+              <div className="flex items-center gap-1 text-amber-300 font-semibold text-[11px]">
                 <Check className="w-3.5 h-3.5" />
-                <span>Permanent Deployment Instructions</span>
+                <span>Repository Path Info</span>
               </div>
               <p className="text-[11px] leading-relaxed">
-                To set a permanent logo file for deployment, add your logo image into the codebase or update <code className="text-amber-300 font-mono bg-slate-900 px-1 py-0.5 rounded">/src/config/brandConfig.ts</code>:
+                Image is saved locally in browser storage. You can also save a logo file as <code className="text-amber-300 font-mono">/public/logo.png</code> in the repository.
               </p>
-              <pre className="p-2 bg-slate-900 rounded border border-slate-800 text-[10px] text-amber-200/90 font-mono overflow-x-auto">
-{`export const BRAND_CONFIG = {
-  logoUrl: '/logo.png', // or your image URL
-};`}
-              </pre>
             </div>
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-4 flex justify-end">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-xl transition-colors cursor-pointer"
               >
                 Close
               </button>
