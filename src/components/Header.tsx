@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Brand & Title */}
           <div className="flex items-center gap-3">
-            <BrandLogo size="md" showTextButton={true} />
+            <BrandLogo size="md" />
             <h1 className="text-lg font-bold tracking-tight text-white hidden sm:block">
               {BRAND_CONFIG.appTitle}
             </h1>
