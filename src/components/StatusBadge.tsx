@@ -1,6 +1,6 @@
 import React from 'react';
 import { OrderStatus } from '../types';
-import { Clock, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
+import { Clock, CheckCircle2, AlertCircle, Ban, PauseCircle } from 'lucide-react';
 
 interface StatusBadgeProps {
   status: OrderStatus;
@@ -38,13 +38,22 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
           Delivered
         </span>
       );
-    case 'Hold/Cancelled':
+    case 'On Hold':
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 font-medium rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/60 ${sizeClasses}`}
+        >
+          <PauseCircle className="w-3.5 h-3.5 text-purple-400" />
+          On Hold
+        </span>
+      );
+    case 'Cancelled':
       return (
         <span
           className={`inline-flex items-center gap-1.5 font-medium rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60 ${sizeClasses}`}
         >
           <Ban className="w-3.5 h-3.5 text-rose-500" />
-          Hold / Cancelled
+          Cancelled
         </span>
       );
     default:

@@ -220,8 +220,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(['Pending', 'Order Placed', 'Delivered', 'Hold/Cancelled'] as OrderStatus[]).map(
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {(['Pending', 'Order Placed', 'Delivered', 'On Hold', 'Cancelled'] as OrderStatus[]).map(
                 (st) => {
                   const isDeliveredOption = st === 'Delivered';
                   const isDisabled = isReadOnly && !isDeliveredOption;

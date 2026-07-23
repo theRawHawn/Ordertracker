@@ -225,7 +225,8 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                         <option value="Pending">Pending</option>
                         <option value="Order Placed">Order Placed</option>
                         <option value="Delivered">Delivered</option>
-                        <option value="Hold/Cancelled">Hold / Cancelled</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Cancelled">Cancelled</option>
                       </select>
                     )}
                   </td>

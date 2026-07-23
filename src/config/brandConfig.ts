@@ -2,7 +2,8 @@
  * Brand & Logo Configuration
  * 
  * To set your permanent logo in the navbar:
- * Replace the `logoUrl` string below with your PNG image link or relative path (e.g., 'https://yourdomain.com/logo.png' or '/logo.png').
+ * Upload your PNG image to the /public/ folder (e.g. /public/logo.png) and set logoUrl to '/logo.png',
+ * or paste your external image link / URL below.
  */
 
 export const BRAND_CONFIG = {
@@ -16,6 +17,6 @@ export const BRAND_CONFIG = {
    * Permanent Brand Logo Image URL / Path (PNG, SVG, JPG, etc.)
    * PASTE YOUR PNG IMAGE HREF / URL HERE:
    */
-  logoUrl: 'https://placehold.co/120x120/1e293b/f59e0b?text=LOGO', // <-- Replace with your PNG image URL or path
+  logoUrl: '/logo.png', // <-- Replace with your PNG image URL or path (e.g., '/logo.png')
 };
 

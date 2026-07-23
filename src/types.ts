@@ -1,4 +1,4 @@
-export type OrderStatus = 'Pending' | 'Order Placed' | 'Delivered' | 'Hold/Cancelled';
+export type OrderStatus = 'Pending' | 'Order Placed' | 'Delivered' | 'On Hold' | 'Cancelled';
 
 export interface BankDetails {
   bankName: string;

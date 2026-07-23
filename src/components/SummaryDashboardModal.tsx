@@ -7,9 +7,9 @@ import {
   CheckCircle,
   PackageCheck,
   Ban,
+  PauseCircle,
   PieChart,
   BarChart3,
-  TrendingUp,
   Building2,
   ArrowRight,
   Filter,
@@ -39,16 +39,19 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
   const pendingOrders = orders.filter((o) => o.status === 'Pending');
   const placedOrders = orders.filter((o) => o.status === 'Order Placed');
   const deliveredOrders = orders.filter((o) => o.status === 'Delivered');
-  const cancelledOrders = orders.filter((o) => o.status === 'Hold/Cancelled');
+  const holdOrders = orders.filter((o) => o.status === 'On Hold');
+  const cancelledOrders = orders.filter((o) => o.status === 'Cancelled');
 
   const pendingAmount = pendingOrders.reduce((sum, o) => sum + o.amount, 0);
   const placedAmount = placedOrders.reduce((sum, o) => sum + o.amount, 0);
   const deliveredAmount = deliveredOrders.reduce((sum, o) => sum + o.amount, 0);
+  const holdAmount = holdOrders.reduce((sum, o) => sum + o.amount, 0);
   const cancelledAmount = cancelledOrders.reduce((sum, o) => sum + o.amount, 0);
 
   const pendingPct = totalCount ? Math.round((pendingOrders.length / totalCount) * 100) : 0;
   const placedPct = totalCount ? Math.round((placedOrders.length / totalCount) * 100) : 0;
   const deliveredPct = totalCount ? Math.round((deliveredOrders.length / totalCount) * 100) : 0;
+  const holdPct = totalCount ? Math.round((holdOrders.length / totalCount) * 100) : 0;
   const cancelledPct = totalCount ? Math.round((cancelledOrders.length / totalCount) * 100) : 0;
 
   // Top Vendors aggregation
@@ -73,7 +76,7 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative text-slate-100">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative text-slate-100">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -132,7 +135,7 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
               <span>Status Distribution</span>
             </span>
             <span className="text-slate-400 text-[11px]">
-              {pendingOrders.length} Pending • {placedOrders.length} Placed • {deliveredOrders.length} Delivered • {cancelledOrders.length} Cancelled
+              {pendingOrders.length} Pending • {placedOrders.length} Placed • {deliveredOrders.length} Delivered • {holdOrders.length} On Hold • {cancelledOrders.length} Cancelled
             </span>
           </div>
 
@@ -154,14 +157,19 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
               title={`Delivered: ${deliveredPct}% (${deliveredOrders.length})`}
             />
             <div
+              style={{ width: `${holdPct}%` }}
+              className="bg-purple-500 h-full transition-all"
+              title={`On Hold: ${holdPct}% (${holdOrders.length})`}
+            />
+            <div
               style={{ width: `${cancelledPct}%` }}
               className="bg-rose-500 h-full transition-all"
-              title={`Hold/Cancelled: ${cancelledPct}% (${cancelledOrders.length})`}
+              title={`Cancelled: ${cancelledPct}% (${cancelledOrders.length})`}
             />
           </div>
 
           {/* Bar Legend */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px] text-slate-400">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2 text-[11px] text-slate-400">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
               <span>Pending ({pendingPct}%)</span>
@@ -175,6 +183,10 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
               <span>Delivered ({deliveredPct}%)</span>
             </div>
             <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
+              <span>On Hold ({holdPct}%)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
               <span>Cancelled ({cancelledPct}%)</span>
             </div>
@@ -182,116 +194,129 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
         </div>
 
         {/* Summary Status Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           {/* Pending Summary */}
-          <div className="bg-slate-950/80 border border-amber-500/30 rounded-xl p-3.5 relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-slate-950/80 border border-amber-500/30 rounded-xl p-3 relative overflow-hidden flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
                   Pending
                 </span>
-                <span className="text-xs font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
                   {pendingOrders.length}
                 </span>
               </div>
-              <div className="text-lg font-extrabold text-white font-mono">
+              <div className="text-base font-extrabold text-white font-mono">
                 {isReadOnly ? '••••••' : formatINR(pendingAmount)}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Awaiting approval / vendor confirmation
-              </p>
             </div>
             <button
               onClick={() => handleFilterClick('Pending')}
-              className="mt-3 w-full py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              className="mt-3 w-full py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span>View Pending</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>View</span>
+              <ArrowRight className="w-3 h-3" />
             </button>
           </div>
 
           {/* Order Placed Summary */}
-          <div className="bg-slate-950/80 border border-blue-500/30 rounded-xl p-3.5 relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-slate-950/80 border border-blue-500/30 rounded-xl p-3 relative overflow-hidden flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
                   <CheckCircle className="w-3.5 h-3.5" />
-                  Order Placed
+                  Placed
                 </span>
-                <span className="text-xs font-bold text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                <span className="text-[10px] font-bold text-blue-300 bg-blue-500/10 px-1.5 py-0.2 rounded border border-blue-500/20">
                   {placedOrders.length}
                 </span>
               </div>
-              <div className="text-lg font-extrabold text-white font-mono">
+              <div className="text-base font-extrabold text-white font-mono">
                 {isReadOnly ? '••••••' : formatINR(placedAmount)}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Approved and currently in dispatch
-              </p>
             </div>
             <button
               onClick={() => handleFilterClick('Order Placed')}
-              className="mt-3 w-full py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              className="mt-3 w-full py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span>View Placed</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>View</span>
+              <ArrowRight className="w-3 h-3" />
             </button>
           </div>
 
           {/* Delivered Summary */}
-          <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-3.5 relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-3 relative overflow-hidden flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
                   <PackageCheck className="w-3.5 h-3.5" />
                   Delivered
                 </span>
-                <span className="text-xs font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
                   {deliveredOrders.length}
                 </span>
               </div>
-              <div className="text-lg font-extrabold text-white font-mono">
+              <div className="text-base font-extrabold text-white font-mono">
                 {isReadOnly ? '••••••' : formatINR(deliveredAmount)}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Fulfilled and received at destination
-              </p>
             </div>
             <button
               onClick={() => handleFilterClick('Delivered')}
-              className="mt-3 w-full py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              className="mt-3 w-full py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span>View Delivered</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>View</span>
+              <ArrowRight className="w-3 h-3" />
             </button>
           </div>
 
-          {/* Hold / Cancelled Summary */}
-          <div className="bg-slate-950/80 border border-rose-500/30 rounded-xl p-3.5 relative overflow-hidden flex flex-col justify-between">
+          {/* On Hold Summary */}
+          <div className="bg-slate-950/80 border border-purple-500/30 rounded-xl p-3 relative overflow-hidden flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
-                  <Ban className="w-3.5 h-3.5" />
-                  Hold / Cancelled
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1">
+                  <PauseCircle className="w-3.5 h-3.5" />
+                  On Hold
                 </span>
-                <span className="text-xs font-bold text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
+                  {holdOrders.length}
+                </span>
+              </div>
+              <div className="text-base font-extrabold text-white font-mono">
+                {isReadOnly ? '••••••' : formatINR(holdAmount)}
+              </div>
+            </div>
+            <button
+              onClick={() => handleFilterClick('On Hold')}
+              className="mt-3 w-full py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+            >
+              <span>View</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* Cancelled Summary */}
+          <div className="bg-slate-950/80 border border-rose-500/30 rounded-xl p-3 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                  <Ban className="w-3.5 h-3.5" />
+                  Cancelled
+                </span>
+                <span className="text-[10px] font-bold text-rose-300 bg-rose-500/10 px-1.5 py-0.2 rounded border border-rose-500/20">
                   {cancelledOrders.length}
                 </span>
               </div>
-              <div className="text-lg font-extrabold text-white font-mono">
+              <div className="text-base font-extrabold text-white font-mono">
                 {isReadOnly ? '••••••' : formatINR(cancelledAmount)}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                On hold, rejected, or cancelled
-              </p>
             </div>
             <button
-              onClick={() => handleFilterClick('Hold/Cancelled')}
-              className="mt-3 w-full py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              onClick={() => handleFilterClick('Cancelled')}
+              className="mt-3 w-full py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span>View Cancelled</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>View</span>
+              <ArrowRight className="w-3 h-3" />
             </button>
           </div>
         </div>
