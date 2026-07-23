@@ -300,6 +300,17 @@ export default function App() {
   // Background Manual Google Sheet Sync Handler
   const handleManualSync = async () => {
     setSheetSyncStatus('syncing');
+    const startTime = Date.now();
+
+    const finishSync = async (status: 'saved' | 'error') => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 800) {
+        await new Promise((r) => setTimeout(r, 800 - elapsed));
+      }
+      setSheetSyncStatus(status);
+      setTimeout(() => setSheetSyncStatus('idle'), 3000);
+    };
+
     try {
       // 1. Save and fetch latest via Vercel Serverless API
       const saveRes = await fetch('/api/orders', {
@@ -314,8 +325,7 @@ export default function App() {
           const data = await fetchRes.json();
           if (data && data.configured && Array.isArray(data.orders)) {
             setOrders(data.orders);
-            setSheetSyncStatus('saved');
-            setTimeout(() => setSheetSyncStatus('idle'), 3000);
+            await finishSync('saved');
             return;
           }
         }
@@ -334,24 +344,20 @@ export default function App() {
           await saveOrdersToGoogleSheet(token, sheetId, orders);
           const fetched = await fetchOrdersFromGoogleSheet(token, sheetId);
           if (fetched) setOrders(fetched);
-          setSheetSyncStatus('saved');
-          setTimeout(() => setSheetSyncStatus('idle'), 3000);
+          await finishSync('saved');
           return;
         }
       } else if (sheetId) {
         const fetched = await fetchPublicGoogleSheet(sheetId);
         if (fetched) setOrders(fetched);
-        setSheetSyncStatus('saved');
-        setTimeout(() => setSheetSyncStatus('idle'), 3000);
+        await finishSync('saved');
         return;
       }
 
-      setSheetSyncStatus('saved');
-      setTimeout(() => setSheetSyncStatus('idle'), 3000);
+      await finishSync('saved');
     } catch (err) {
       console.error('Manual background sync error:', err);
-      setSheetSyncStatus('error');
-      setTimeout(() => setSheetSyncStatus('idle'), 4000);
+      await finishSync('error');
     }
   };
 
