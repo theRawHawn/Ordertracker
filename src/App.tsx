@@ -17,6 +17,8 @@ import {
 } from './services/googleAuth';
 import {
   getStoredSpreadsheetId,
+  setStoredSpreadsheetId,
+  findOrCreateOrderSpreadsheet,
   saveOrdersToGoogleSheet,
   fetchOrdersFromGoogleSheet,
   fetchPublicGoogleSheet,
@@ -105,35 +107,58 @@ export default function App() {
   useEffect(() => {
     initAuth();
 
-    // 1. First try Vercel Serverless Function /api/orders
-    fetch('/api/orders')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.configured && Array.isArray(data.orders) && data.orders.length > 0) {
-          setOrders(data.orders);
-          return;
-        }
-        // 2. Fallback to stored Google Sheet ID via client OAuth or public sheet link
-        const sheetId = getStoredSpreadsheetId();
-        const token = getAccessToken();
-
-        if (sheetId) {
-          if (token) {
-            fetchOrdersFromGoogleSheet(token, sheetId)
-              .then((fetched) => {
-                if (fetched && fetched.length > 0) setOrders(fetched);
-              })
-              .catch((err) => console.log('Auto fetch client sheet error:', err));
-          } else {
-            fetchPublicGoogleSheet(sheetId)
-              .then((fetched) => {
-                if (fetched && fetched.length > 0) setOrders(fetched);
-              })
-              .catch((err) => console.log('Public sheet auto fetch error:', err));
+    const loadInitialData = async () => {
+      // 1. First try Vercel Serverless Function /api/orders
+      try {
+        const res = await fetch('/api/orders');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.configured && Array.isArray(data.orders)) {
+            setOrders(data.orders);
+            setSheetSyncStatus('saved');
+            setTimeout(() => setSheetSyncStatus('idle'), 3000);
+            return;
           }
         }
-      })
-      .catch((err) => console.log('Vercel API fetch error:', err));
+      } catch (err) {
+        console.log('Vercel API fetch error:', err);
+      }
+
+      // 2. Fallback to Google OAuth or stored Google Sheet ID
+      let sheetId = getStoredSpreadsheetId();
+      const token = getAccessToken();
+
+      if (token && !sheetId) {
+        try {
+          sheetId = await findOrCreateOrderSpreadsheet(token);
+          setStoredSpreadsheetId(sheetId);
+        } catch (err) {
+          console.log('Auto find/create sheet error:', err);
+        }
+      }
+
+      if (sheetId) {
+        if (token) {
+          fetchOrdersFromGoogleSheet(token, sheetId)
+            .then((fetched) => {
+              if (fetched) {
+                setOrders(fetched);
+                setSheetSyncStatus('saved');
+                setTimeout(() => setSheetSyncStatus('idle'), 3000);
+              }
+            })
+            .catch((err) => console.log('Auto fetch client sheet error:', err));
+        } else {
+          fetchPublicGoogleSheet(sheetId)
+            .then((fetched) => {
+              if (fetched) setOrders(fetched);
+            })
+            .catch((err) => console.log('Public sheet auto fetch error:', err));
+        }
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   // Save to LocalStorage & auto-save to Google Sheet DB whenever orders change
@@ -147,8 +172,8 @@ export default function App() {
 
     if (isReadOnly) return;
 
-    const token = getAccessToken();
-    const sheetId = getStoredSpreadsheetId();
+    let token = getAccessToken();
+    let sheetId = getStoredSpreadsheetId();
 
     const syncToSheets = async () => {
       setSheetSyncStatus('syncing');
@@ -172,20 +197,29 @@ export default function App() {
       }
 
       // If Vercel API did not handle it, try Client-side Google Sheets OAuth
-      if (!success && token && sheetId) {
-        try {
-          await saveOrdersToGoogleSheet(token, sheetId, orders);
-          success = true;
-        } catch (err) {
-          console.error('Client Google Sheet save error:', err);
+      if (!success && token) {
+        if (!sheetId) {
+          try {
+            sheetId = await findOrCreateOrderSpreadsheet(token);
+            setStoredSpreadsheetId(sheetId);
+          } catch (e) {
+            // Sheet creation failed
+          }
+        }
+
+        if (sheetId) {
+          try {
+            await saveOrdersToGoogleSheet(token, sheetId, orders);
+            success = true;
+          } catch (err) {
+            console.error('Client Google Sheet save error:', err);
+          }
         }
       }
 
       if (success) {
         setSheetSyncStatus('saved');
         setTimeout(() => setSheetSyncStatus('idle'), 3000);
-      } else if (token && sheetId) {
-        setSheetSyncStatus('error');
       } else {
         setSheetSyncStatus('idle');
       }
@@ -200,18 +234,32 @@ export default function App() {
   }, [deletedOrders]);
 
   // Background polling: periodically pull the latest data from Google Sheets
-  // so changes made elsewhere (another device, tab, or teammate) show up
-  // without needing a manual "Load Orders from Google Sheet" click.
+  // so changes made elsewhere show up automatically without manual clicks.
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const poll = async () => {
-      // Skip a tick if the tab is backgrounded, a save is already in flight,
-      // or the user is actively editing an order — avoids clobbering work in progress.
       if (document.visibilityState === 'hidden') return;
       if (sheetSyncStatusRef.current === 'syncing') return;
       if (isFormModalOpenRef.current) return;
 
+      // 1. Try Vercel Serverless API
+      try {
+        const vercelRes = await fetch('/api/orders');
+        if (vercelRes.ok) {
+          const data = await vercelRes.json();
+          if (data && data.configured && Array.isArray(data.orders)) {
+            if (!areOrdersEquivalent(data.orders, ordersRef.current)) {
+              setOrders(data.orders);
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        // Vercel API poll error
+      }
+
+      // 2. Fallback to client OAuth or public sheet ID
       const sheetId = getStoredSpreadsheetId();
       if (!sheetId) return;
 

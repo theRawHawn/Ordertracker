@@ -113,8 +113,12 @@ export const loadStoredOrders = (initialOrders: PurchaseOrder[] = []): PurchaseO
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored !== null) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        // Filter out legacy dummy sample orders if any exist
+        const cleaned = parsed.filter(
+          (o) => !['QT-2026-101', 'QT-2026-102', 'QT-2026-103', 'QT-2026-104'].includes(o.id)
+        );
+        return cleaned;
       }
     }
   } catch (err) {
