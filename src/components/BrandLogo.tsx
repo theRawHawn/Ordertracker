@@ -20,7 +20,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     } catch {
       // fallback
     }
-    return BRAND_CONFIG.logoUrl || '/logo.png';
+    return BRAND_CONFIG.logoUrl || '/sapien-logo.png';
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,7 +71,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   };
 
   const handleResetLogo = () => {
-    setCustomLogo(BRAND_CONFIG.logoUrl || '/logo.png');
+    setCustomLogo(BRAND_CONFIG.logoUrl || '/sapien-logo.png');
     try {
       localStorage.removeItem('brand_custom_logo_v1');
     } catch (err) {
@@ -249,7 +249,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
                 <span>Repository Path Info</span>
               </div>
               <p className="text-[11px] leading-relaxed">
-                Image is saved locally in browser storage. You can also save a logo file as <code className="text-amber-300 font-mono">/public/logo.png</code> in the repository.
+                Image is saved locally in browser storage. You can also save a logo file as <code className="text-amber-300 font-mono">/public/sapien-logo.png</code> in the repository.
               </p>
             </div>
 

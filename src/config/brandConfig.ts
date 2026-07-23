@@ -16,6 +16,6 @@ export const BRAND_CONFIG = {
   /** 
    * Permanent Brand Logo Image URL / Path (PNG, SVG, JPG, etc.)
    */
-  logoUrl: '/logo.png',
+  logoUrl: '/sapien-logo.png',
 };
 
