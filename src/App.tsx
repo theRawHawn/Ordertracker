@@ -32,7 +32,6 @@ import { OrderFormModal } from './components/OrderFormModal';
 import { OrderDetailModal } from './components/OrderDetailModal';
 import { QuotePreviewModal } from './components/QuotePreviewModal';
 import { TrashBinModal } from './components/TrashBinModal';
-import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 
 // How often (ms) to pull the latest data from Google Sheets in the background.
 const SHEET_POLL_INTERVAL_MS = 20000;
@@ -65,7 +64,6 @@ export default function App() {
     loadStoredDeletedOrders()
   );
   const [isTrashBinOpen, setIsTrashBinOpen] = useState(false);
-  const [isGoogleSheetSyncOpen, setIsGoogleSheetSyncOpen] = useState(false);
 
   // Sync Status Indicator
   const [sheetSyncStatus, setSheetSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
@@ -297,6 +295,64 @@ export default function App() {
     setIsReadOnly(false);
   };
 
+  // Background Manual Google Sheet Sync Handler
+  const handleManualSync = async () => {
+    setSheetSyncStatus('syncing');
+    try {
+      // 1. Save and fetch latest via Vercel Serverless API
+      const saveRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'saveAll', orders }),
+      });
+
+      if (saveRes.ok) {
+        const fetchRes = await fetch('/api/orders');
+        if (fetchRes.ok) {
+          const data = await fetchRes.json();
+          if (data && data.configured && Array.isArray(data.orders)) {
+            setOrders(data.orders);
+            setSheetSyncStatus('saved');
+            setTimeout(() => setSheetSyncStatus('idle'), 3000);
+            return;
+          }
+        }
+      }
+
+      // 2. Fallback to client OAuth or public sheet ID
+      let token = getAccessToken();
+      let sheetId = getStoredSpreadsheetId();
+
+      if (token) {
+        if (!sheetId) {
+          sheetId = await findOrCreateOrderSpreadsheet(token);
+          setStoredSpreadsheetId(sheetId);
+        }
+        if (sheetId) {
+          await saveOrdersToGoogleSheet(token, sheetId, orders);
+          const fetched = await fetchOrdersFromGoogleSheet(token, sheetId);
+          if (fetched) setOrders(fetched);
+          setSheetSyncStatus('saved');
+          setTimeout(() => setSheetSyncStatus('idle'), 3000);
+          return;
+        }
+      } else if (sheetId) {
+        const fetched = await fetchPublicGoogleSheet(sheetId);
+        if (fetched) setOrders(fetched);
+        setSheetSyncStatus('saved');
+        setTimeout(() => setSheetSyncStatus('idle'), 3000);
+        return;
+      }
+
+      setSheetSyncStatus('saved');
+      setTimeout(() => setSheetSyncStatus('idle'), 3000);
+    } catch (err) {
+      console.error('Manual background sync error:', err);
+      setSheetSyncStatus('error');
+      setTimeout(() => setSheetSyncStatus('idle'), 4000);
+    }
+  };
+
   // Order / Quote CRUD Handlers
   const handleCreateOrUpdateOrder = (orderData: Partial<PurchaseOrder>) => {
     if (editingOrder) {
@@ -486,7 +542,7 @@ export default function App() {
         syncStatus={sheetSyncStatus}
         deletedCount={deletedOrders.length}
         onOpenTrashBin={() => setIsTrashBinOpen(true)}
-        onOpenGoogleSheetSync={() => setIsGoogleSheetSyncOpen(true)}
+        onManualSync={handleManualSync}
         onNewOrder={() => {
           if (isReadOnly) return;
           setEditingOrder(null);
@@ -569,13 +625,6 @@ export default function App() {
         onPermanentDeleteOrder={handlePermanentDeleteOrder}
         onEmptyTrash={handleEmptyTrash}
         isReadOnly={isReadOnly}
-      />
-
-      <GoogleSheetSyncModal
-        isOpen={isGoogleSheetSyncOpen}
-        onClose={() => setIsGoogleSheetSyncOpen(false)}
-        orders={orders}
-        onSyncOrdersFromSheet={(sheetOrders) => setOrders(sheetOrders)}
       />
     </div>
   );
