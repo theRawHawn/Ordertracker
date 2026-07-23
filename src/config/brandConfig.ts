@@ -8,15 +8,14 @@
 
 export const BRAND_CONFIG = {
   /** Company / Brand Name */
-  brandName: 'Company Brand',
+  brandName: 'Sapien Robotics',
 
   /** Application Name */
   appTitle: 'Order Tracker',
 
   /** 
    * Permanent Brand Logo Image URL / Path (PNG, SVG, JPG, etc.)
-   * PASTE YOUR PNG IMAGE HREF / URL HERE:
    */
-  logoUrl: '/logo.png', // <-- Replace with your PNG image URL or path (e.g., '/logo.png')
+  logoUrl: '/logo.svg',
 };
 

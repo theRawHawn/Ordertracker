@@ -20,7 +20,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     } catch {
       // fallback
     }
-    return BRAND_CONFIG.logoUrl || '/logo.png';
+    return BRAND_CONFIG.logoUrl || '/logo.svg';
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
