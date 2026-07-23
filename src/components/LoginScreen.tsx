@@ -10,18 +10,10 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
-  const [storedCreds, setStoredCreds] = useState(() => getStoredCredentials());
-  const [username, setUsername] = useState(storedCreds.username);
-  const [password, setPassword] = useState(storedCreds.password);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const active = getStoredCredentials();
-    setStoredCreds(active);
-    setUsername(active.username);
-    setPassword(active.password);
-  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
