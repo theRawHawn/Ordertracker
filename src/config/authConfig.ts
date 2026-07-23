@@ -10,5 +10,5 @@ export const AUTH_CONFIG = {
   username: 'admin',
   
   /** Portal Password - Edit this value to change your password */
-  password: 'admin123',
+  password: 'aryaman',
 };
