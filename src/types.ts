@@ -30,3 +30,8 @@ export interface PurchaseOrder {
 }
 
 export type ViewMode = 'table' | 'cards';
+
+export interface DeletedOrder extends PurchaseOrder {
+  deletedAt: string;
+  deletedBy?: string;
+}

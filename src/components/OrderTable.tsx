@@ -283,17 +283,17 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-base">Delete Quote?</h3>
-                <p className="text-xs text-slate-400">This action cannot be undone</p>
+                <h3 className="font-bold text-white text-base">Move Quote to Trash Bin?</h3>
+                <p className="text-xs text-slate-400">Can be restored anytime from Trash Bin</p>
               </div>
             </div>
 
             <p className="text-xs text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800 mb-5 font-mono">
-              Are you sure you want to permanently delete quote{' '}
+              Move quote{' '}
               <span className="text-amber-400 font-bold">
                 {orderToDelete.quoteNumber || orderToDelete.id}
               </span>{' '}
-              for <span className="text-white font-semibold">{orderToDelete.vendorName}</span>?
+              for <span className="text-white font-semibold">{orderToDelete.vendorName}</span> to Trash Bin backup?
             </p>
 
             <div className="flex items-center gap-2">

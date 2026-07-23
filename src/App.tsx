@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PurchaseOrder, OrderStatus } from './types';
+import { PurchaseOrder, OrderStatus, DeletedOrder } from './types';
 import { INITIAL_ORDERS } from './data/sampleData';
 import {
   loadStoredOrders,
   saveOrdersToStorage,
+  loadStoredDeletedOrders,
+  saveDeletedOrdersToStorage,
   getStoredAuth,
   setStoredAuth,
   getStoredReadOnly,
@@ -27,6 +29,7 @@ import { OrderTable } from './components/OrderTable';
 import { OrderFormModal } from './components/OrderFormModal';
 import { OrderDetailModal } from './components/OrderDetailModal';
 import { QuotePreviewModal } from './components/QuotePreviewModal';
+import { TrashBinModal } from './components/TrashBinModal';
 
 export default function App() {
   // Authentication State
@@ -37,6 +40,12 @@ export default function App() {
   const [orders, setOrders] = useState<PurchaseOrder[]>(() =>
     loadStoredOrders(INITIAL_ORDERS)
   );
+
+  // Deleted Orders / Trash Bin State
+  const [deletedOrders, setDeletedOrders] = useState<DeletedOrder[]>(() =>
+    loadStoredDeletedOrders()
+  );
+  const [isTrashBinOpen, setIsTrashBinOpen] = useState(false);
 
   // Sync Status Indicator
   const [sheetSyncStatus, setSheetSyncStatus] = useState<'idle' | 'syncing' | 'saved' | 'error'>('idle');
@@ -112,6 +121,11 @@ export default function App() {
     }
   }, [orders, isReadOnly]);
 
+  // Persist Trash Bin items to local storage
+  useEffect(() => {
+    saveDeletedOrdersToStorage(deletedOrders);
+  }, [deletedOrders]);
+
   // Auth Handlers
   const handleLoginSuccess = (readOnly: boolean) => {
     setStoredAuth(true);
@@ -181,11 +195,38 @@ export default function App() {
   };
 
   const handleDeleteOrder = (id: string) => {
+    const targetOrder = orders.find((o) => o.id === id);
+    if (targetOrder) {
+      const deletedItem: DeletedOrder = {
+        ...targetOrder,
+        deletedAt: new Date().toISOString(),
+        deletedBy: isReadOnly ? 'Guest' : 'Admin',
+      };
+      setDeletedOrders((prev) => [deletedItem, ...prev]);
+    }
+
     setOrders((prev) => prev.filter((o) => o.id !== id));
     if (selectedOrderDetails?.id === id) {
       setIsDetailModalOpen(false);
       setSelectedOrderDetails(null);
     }
+  };
+
+  const handleRestoreOrder = (id: string) => {
+    const itemToRestore = deletedOrders.find((d) => d.id === id);
+    if (itemToRestore) {
+      const { deletedAt, deletedBy, ...restoredOrder } = itemToRestore;
+      setOrders((prev) => [restoredOrder, ...prev]);
+      setDeletedOrders((prev) => prev.filter((d) => d.id !== id));
+    }
+  };
+
+  const handlePermanentDeleteOrder = (id: string) => {
+    setDeletedOrders((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  const handleEmptyTrash = () => {
+    setDeletedOrders([]);
   };
 
   const handleStatusChange = (id: string, newStatus: OrderStatus) => {
@@ -285,6 +326,8 @@ export default function App() {
         orders={orders}
         isReadOnly={isReadOnly}
         syncStatus={sheetSyncStatus}
+        deletedCount={deletedOrders.length}
+        onOpenTrashBin={() => setIsTrashBinOpen(true)}
         onNewOrder={() => {
           if (isReadOnly) return;
           setEditingOrder(null);
@@ -357,6 +400,16 @@ export default function App() {
         onClose={() => setQuotePreview(null)}
         quoteUrl={quotePreview?.url || ''}
         vendorName={quotePreview?.vendorName || ''}
+      />
+
+      <TrashBinModal
+        isOpen={isTrashBinOpen}
+        onClose={() => setIsTrashBinOpen(false)}
+        deletedOrders={deletedOrders}
+        onRestoreOrder={handleRestoreOrder}
+        onPermanentDeleteOrder={handlePermanentDeleteOrder}
+        onEmptyTrash={handleEmptyTrash}
+        isReadOnly={isReadOnly}
       />
     </div>
   );

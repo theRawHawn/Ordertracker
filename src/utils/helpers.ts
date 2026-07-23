@@ -1,4 +1,4 @@
-import { PurchaseOrder } from '../types';
+import { PurchaseOrder, DeletedOrder } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -122,6 +122,31 @@ export const saveOrdersToStorage = (orders: PurchaseOrder[]): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
   } catch (err) {
     console.error('Failed to save orders to localStorage:', err);
+  }
+};
+
+const TRASH_STORAGE_KEY = 'order_tracker_trash_bin_v1';
+
+export const loadStoredDeletedOrders = (): DeletedOrder[] => {
+  try {
+    const stored = localStorage.getItem(TRASH_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load trash bin from localStorage:', err);
+  }
+  return [];
+};
+
+export const saveDeletedOrdersToStorage = (deletedOrders: DeletedOrder[]): void => {
+  try {
+    localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(deletedOrders));
+  } catch (err) {
+    console.error('Failed to save trash bin to localStorage:', err);
   }
 };
 

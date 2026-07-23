@@ -14,6 +14,7 @@ import {
   Table,
   Eye,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { BRAND_CONFIG } from '../config/brandConfig';
@@ -30,6 +31,8 @@ interface HeaderProps {
   orders: PurchaseOrder[];
   isReadOnly?: boolean;
   syncStatus?: 'idle' | 'syncing' | 'saved' | 'error';
+  deletedCount?: number;
+  onOpenTrashBin?: () => void;
   onNewOrder: () => void;
   onImportData: (importedOrders: PurchaseOrder[]) => void;
   onLogout: () => void;
@@ -43,6 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
   orders,
   isReadOnly = false,
   syncStatus = 'idle',
+  deletedCount = 0,
+  onOpenTrashBin,
   onNewOrder,
   onImportData,
   onLogout,
@@ -156,6 +161,23 @@ export const Header: React.FC<HeaderProps> = ({
                 {syncStatus === 'syncing' ? 'Saving...' : 'Sheet DB'}
               </span>
             </button>
+
+            {/* Trash Bin / Backup Button */}
+            {onOpenTrashBin && (
+              <button
+                onClick={onOpenTrashBin}
+                title="View deleted orders & recoverable backups"
+                className="py-1.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm relative"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Trash Bin</span>
+                {deletedCount > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-mono bg-rose-500 text-white font-bold rounded-full">
+                    {deletedCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Multi-Format Export Dropdown */}
             <div className="relative">
