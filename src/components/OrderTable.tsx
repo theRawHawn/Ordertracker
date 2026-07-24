@@ -84,7 +84,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
               <th className="py-3.5 px-4">Vendor Name</th>
               <th className="py-3.5 px-4 text-right">Amount (₹)</th>
               <th className="py-3.5 px-4">Bank Details</th>
-              <th className="py-3.5 px-4">PDF Quote</th>
+              {!isReadOnly && <th className="py-3.5 px-4">PDF Quote</th>}
               <th className="py-3.5 px-4">Status</th>
               <th className="py-3.5 px-4 text-center">Actions</th>
             </tr>
@@ -171,30 +171,32 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                   </td>
 
                   {/* PDF Quote */}
-                  <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
-                    {order.driveQuoteLink ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => onOpenQuote(order.driveQuoteLink, order.vendorName)}
-                          className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg transition-colors flex items-center gap-1 font-medium text-[11px] cursor-pointer"
-                        >
-                          <FileText className="w-3 h-3 text-amber-400" />
-                          <span>View PDF</span>
-                        </button>
-                        <a
-                          href={order.driveQuoteLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1 text-slate-400 hover:text-white transition-colors"
-                          title="Open Drive Link"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-500 italic">No PDF</span>
-                    )}
-                  </td>
+                  {!isReadOnly && (
+                    <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                      {order.driveQuoteLink ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => onOpenQuote(order.driveQuoteLink, order.vendorName)}
+                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg transition-colors flex items-center gap-1 font-medium text-[11px] cursor-pointer"
+                          >
+                            <FileText className="w-3 h-3 text-amber-400" />
+                            <span>View PDF</span>
+                          </button>
+                          <a
+                            href={order.driveQuoteLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 text-slate-400 hover:text-white transition-colors"
+                            title="Open Drive Link"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-500 italic">No PDF</span>
+                      )}
+                    </td>
+                  )}
 
                   {/* Status Dropdown / Badge */}
                   <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>

@@ -103,6 +103,79 @@ export default function App() {
     isFormModalOpenRef.current = isFormModalOpen;
   }, [isFormModalOpen]);
 
+  // --- Robust, race-free save handling -------------------------------------
+  // syncLockRef is set to true the INSTANT an order is changed locally (synchronously,
+  // no waiting for React state/effects to catch up) so the background poll can never
+  // sneak in and overwrite an optimistic UI change with stale sheet data.
+  // isSavingRef/pendingSaveRef turn concurrent edits into a strictly sequential queue —
+  // only one write to the sheet is ever in flight, and it always ends up saving the
+  // latest local state, so out-of-order network responses can no longer clobber a
+  // newer status change with an older one.
+  const syncLockRef = useRef(false);
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set right before setOrders() whenever the new data came FROM the sheet
+  // (initial load, background poll, manual sync) rather than a local edit —
+  // prevents an unnecessary/looping write-back of data we just read.
+  const remoteUpdateRef = useRef(false);
+
+  async function performSave() {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+
+    while (pendingSaveRef.current) {
+      pendingSaveRef.current = false;
+      const snapshot = ordersRef.current;
+      let success = false;
+
+      // 1. Try Vercel Serverless API first
+      try {
+        const vercelRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'saveAll', orders: snapshot }),
+        });
+        if (vercelRes.ok) {
+          const resData = await vercelRes.json();
+          if (resData.success) success = true;
+        }
+      } catch (err) {
+        // Vercel API not configured or offline
+      }
+
+      // 2. Fallback to client-side Google Sheets OAuth if the backend didn't handle it
+      if (!success) {
+        let token = getAccessToken();
+        let sheetId = getStoredSpreadsheetId();
+
+        if (token) {
+          try {
+            if (!sheetId) {
+              sheetId = await findOrCreateOrderSpreadsheet(token);
+              setStoredSpreadsheetId(sheetId);
+            }
+            if (sheetId) {
+              await saveOrdersToGoogleSheet(token, sheetId, snapshot);
+              success = true;
+            }
+          } catch (err) {
+            console.error('Client Google Sheet save error:', err);
+          }
+        }
+      }
+
+      if (!success) {
+        console.error('Failed to save orders — will retry on next change.');
+      }
+    }
+
+    isSavingRef.current = false;
+    syncLockRef.current = false;
+    setSheetSyncStatus('saved');
+    setTimeout(() => setSheetSyncStatus('idle'), 3000);
+  }
+
   // Initialize Auth & initial Sheet fetch
   useEffect(() => {
     initAuth();
@@ -114,6 +187,7 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (data && data.configured && Array.isArray(data.orders)) {
+            remoteUpdateRef.current = true;
             setOrders(data.orders);
             setSheetSyncStatus('saved');
             setTimeout(() => setSheetSyncStatus('idle'), 3000);
@@ -142,6 +216,7 @@ export default function App() {
           fetchOrdersFromGoogleSheet(token, sheetId)
             .then((fetched) => {
               if (fetched) {
+                remoteUpdateRef.current = true;
                 setOrders(fetched);
                 setSheetSyncStatus('saved');
                 setTimeout(() => setSheetSyncStatus('idle'), 3000);
@@ -151,7 +226,10 @@ export default function App() {
         } else {
           fetchPublicGoogleSheet(sheetId)
             .then((fetched) => {
-              if (fetched) setOrders(fetched);
+              if (fetched) {
+                remoteUpdateRef.current = true;
+                setOrders(fetched);
+              }
             })
             .catch((err) => console.log('Public sheet auto fetch error:', err));
         }
@@ -161,7 +239,9 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // Save to LocalStorage & auto-save to Google Sheet DB whenever orders change
+  // Save to LocalStorage & auto-save to Google Sheet DB whenever orders change.
+  // The lock is engaged synchronously (see syncLockRef) so a background poll
+  // firing in the same tick can never overwrite this change with stale data.
   useEffect(() => {
     saveOrdersToStorage(orders);
 
@@ -170,62 +250,28 @@ export default function App() {
       return;
     }
 
+    if (remoteUpdateRef.current) {
+      // This update came from the sheet itself (initial load / poll / manual
+      // sync) — no need to write it straight back.
+      remoteUpdateRef.current = false;
+      return;
+    }
+
     if (isReadOnly) return;
 
-    let token = getAccessToken();
-    let sheetId = getStoredSpreadsheetId();
+    syncLockRef.current = true;
+    pendingSaveRef.current = true;
+    setSheetSyncStatus('syncing');
 
-    const syncToSheets = async () => {
-      setSheetSyncStatus('syncing');
-      let success = false;
-
-      // Try Vercel Serverless API first
-      try {
-        const vercelRes = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'saveAll', orders }),
-        });
-        if (vercelRes.ok) {
-          const resData = await vercelRes.json();
-          if (resData.success) {
-            success = true;
-          }
-        }
-      } catch (err) {
-        // Vercel API not configured or offline
-      }
-
-      // If Vercel API did not handle it, try Client-side Google Sheets OAuth
-      if (!success && token) {
-        if (!sheetId) {
-          try {
-            sheetId = await findOrCreateOrderSpreadsheet(token);
-            setStoredSpreadsheetId(sheetId);
-          } catch (e) {
-            // Sheet creation failed
-          }
-        }
-
-        if (sheetId) {
-          try {
-            await saveOrdersToGoogleSheet(token, sheetId, orders);
-            success = true;
-          } catch (err) {
-            console.error('Client Google Sheet save error:', err);
-          }
-        }
-      }
-
-      if (success) {
-        setSheetSyncStatus('saved');
-        setTimeout(() => setSheetSyncStatus('idle'), 3000);
-      } else {
-        setSheetSyncStatus('idle');
-      }
-    };
-
-    syncToSheets();
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+    }
+    // Debounce so rapid successive edits (e.g. changing several statuses back
+    // to back) collapse into a single write of the final, latest state instead
+    // of firing overlapping/out-of-order requests.
+    saveDebounceRef.current = setTimeout(() => {
+      performSave();
+    }, 600);
   }, [orders, isReadOnly]);
 
   // Persist Trash Bin items to local storage
@@ -240,6 +286,7 @@ export default function App() {
 
     const poll = async () => {
       if (document.visibilityState === 'hidden') return;
+      if (syncLockRef.current) return;
       if (sheetSyncStatusRef.current === 'syncing') return;
       if (isFormModalOpenRef.current) return;
 
@@ -249,7 +296,8 @@ export default function App() {
         if (vercelRes.ok) {
           const data = await vercelRes.json();
           if (data && data.configured && Array.isArray(data.orders)) {
-            if (!areOrdersEquivalent(data.orders, ordersRef.current)) {
+            if (!syncLockRef.current && !areOrdersEquivalent(data.orders, ordersRef.current)) {
+              remoteUpdateRef.current = true;
               setOrders(data.orders);
             }
             return;
@@ -270,7 +318,8 @@ export default function App() {
           ? await fetchOrdersFromGoogleSheet(token, sheetId)
           : await fetchPublicGoogleSheet(sheetId);
 
-        if (fetched && !areOrdersEquivalent(fetched, ordersRef.current)) {
+        if (fetched && !syncLockRef.current && !areOrdersEquivalent(fetched, ordersRef.current)) {
+          remoteUpdateRef.current = true;
           setOrders(fetched);
         }
       } catch (err) {
@@ -299,6 +348,14 @@ export default function App() {
 
   // Background Manual Google Sheet Sync Handler
   const handleManualSync = async () => {
+    // Also cancel/absorb any pending debounced auto-save so it doesn't fire
+    // a duplicate/overlapping write right after this manual one.
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+    }
+    pendingSaveRef.current = false;
+    syncLockRef.current = true;
     setSheetSyncStatus('syncing');
     const startTime = Date.now();
 
@@ -307,6 +364,7 @@ export default function App() {
       if (elapsed < 800) {
         await new Promise((r) => setTimeout(r, 800 - elapsed));
       }
+      syncLockRef.current = false;
       setSheetSyncStatus(status);
       setTimeout(() => setSheetSyncStatus('idle'), 3000);
     };
@@ -324,6 +382,7 @@ export default function App() {
         if (fetchRes.ok) {
           const data = await fetchRes.json();
           if (data && data.configured && Array.isArray(data.orders)) {
+            remoteUpdateRef.current = true;
             setOrders(data.orders);
             await finishSync('saved');
             return;
@@ -343,13 +402,19 @@ export default function App() {
         if (sheetId) {
           await saveOrdersToGoogleSheet(token, sheetId, orders);
           const fetched = await fetchOrdersFromGoogleSheet(token, sheetId);
-          if (fetched) setOrders(fetched);
+          if (fetched) {
+            remoteUpdateRef.current = true;
+            setOrders(fetched);
+          }
           await finishSync('saved');
           return;
         }
       } else if (sheetId) {
         const fetched = await fetchPublicGoogleSheet(sheetId);
-        if (fetched) setOrders(fetched);
+        if (fetched) {
+          remoteUpdateRef.current = true;
+          setOrders(fetched);
+        }
         await finishSync('saved');
         return;
       }

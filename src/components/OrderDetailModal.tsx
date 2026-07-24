@@ -338,42 +338,44 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           </div>
 
           {/* PDF Quote Attachment */}
-          <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                <FileText className="w-5 h-5" />
+          {!isReadOnly && (
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Google Drive PDF Quotation</h4>
+                  <p className="text-[11px] text-slate-400 truncate max-w-xs">
+                    {order.driveQuoteLink || 'No URL attached'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-white">Google Drive PDF Quotation</h4>
-                <p className="text-[11px] text-slate-400 truncate max-w-xs">
-                  {order.driveQuoteLink || 'No URL attached'}
-                </p>
-              </div>
-            </div>
 
-            {order.driveQuoteLink ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onOpenQuote(order.driveQuoteLink, order.vendorName)}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Preview PDF</span>
-                </button>
-                <a
-                  href={order.driveQuoteLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
-                  title="Open directly in Drive"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            ) : (
-              <span className="text-xs text-slate-500">No quote attached</span>
-            )}
-          </div>
+              {order.driveQuoteLink ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onOpenQuote(order.driveQuoteLink, order.vendorName)}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Preview PDF</span>
+                  </button>
+                  <a
+                    href={order.driveQuoteLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                    title="Open directly in Drive"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500">No quote attached</span>
+              )}
+            </div>
+          )}
 
           {/* Activity Logs */}
           <div>
