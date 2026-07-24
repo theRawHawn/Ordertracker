@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       });
 
       const rows = response.data.values || [];
-      const orders = rows.map((row) => {
+      const orders = rows.map((row, rowIndex) => {
         const [
           id,
           quoteNumber,
@@ -99,7 +99,7 @@ export default async function handler(req, res) {
         ] = row;
 
         return {
-          id: id || quoteNumber || `QT-${Date.now()}`,
+          id: id || quoteNumber || `QT-${Date.now()}-${rowIndex}`,
           quoteNumber: quoteNumber || id || '',
           vendorName: vendorName || 'Unknown Vendor',
           quoteDate: quoteDate || new Date().toISOString().slice(0, 10),

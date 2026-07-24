@@ -38,6 +38,43 @@ import { triggerBirthdayBurst } from './utils/confetti';
 // How often (ms) to pull the latest data from Google Sheets in the background.
 const SHEET_POLL_INTERVAL_MS = 20000;
 
+// Generates a globally unique internal identifier for an order, completely
+// independent of the user-facing Quote Number. This is critical: the Quote
+// Number is a free-text field and vendors like Amazon frequently have no
+// quote number at all, so users type placeholders like "NA" — if that value
+// were ever reused as the internal `id`, every order sharing that quote
+// number would collide (same React key, same match target for edit/delete/
+// status-change), corrupting/duplicating unrelated orders. `id` must always
+// be unique; `quoteNumber` is free to repeat or say "NA".
+function generateUniqueOrderId(): string {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `ord-${Date.now().toString(36)}-${rand}`;
+}
+
+// Self-heals any orders that are missing an id or share an id with another
+// order (e.g. legacy data saved before the fix above, or rows imported/
+// synced from a Google Sheet where the ID column was blank or duplicated).
+// Keeps the first occurrence of each id untouched and reassigns a fresh,
+// guaranteed-unique id to every subsequent duplicate.
+function healDuplicateOrderIds(list: PurchaseOrder[]): { orders: PurchaseOrder[]; changed: boolean } {
+  const seen = new Set<string>();
+  let changed = false;
+
+  const healed = list.map((o) => {
+    const currentId = o.id && o.id.trim() ? o.id : '';
+    if (!currentId || seen.has(currentId)) {
+      changed = true;
+      const newId = generateUniqueOrderId();
+      seen.add(newId);
+      return { ...o, id: newId };
+    }
+    seen.add(currentId);
+    return o;
+  });
+
+  return { orders: healed, changed };
+}
+
 // Compares two order lists while ignoring `deliveryLogs`, since
 // fetchOrdersFromGoogleSheet/fetchPublicGoogleSheet stamp a fresh
 // "Loaded from synchronized Google Sheet" log entry on every call —
@@ -56,9 +93,10 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => getStoredAuth());
   const [isReadOnly, setIsReadOnly] = useState<boolean>(() => getStoredReadOnly());
 
-  // Orders State loaded from local storage alternative
-  const [orders, setOrders] = useState<PurchaseOrder[]>(() =>
-    loadStoredOrders(INITIAL_ORDERS)
+  // Orders State loaded from local storage alternative (self-healed in case
+  // any locally cached orders share a duplicate/missing id).
+  const [orders, setOrders] = useState<PurchaseOrder[]>(
+    () => healDuplicateOrderIds(loadStoredOrders(INITIAL_ORDERS)).orders
   );
 
   // Deleted Orders / Trash Bin State
@@ -176,6 +214,20 @@ export default function App() {
     setTimeout(() => setSheetSyncStatus('idle'), 3000);
   }
 
+  // Applies an order list fetched from the sheet/backend. If any orders are
+  // missing an id or collide with another order's id (e.g. legacy data),
+  // it heals them locally AND treats the result as a local edit (not a
+  // remote update) so the corrected, unique ids get written straight back
+  // to the sheet — permanently fixing the source of the corruption instead
+  // of just papering over it in the UI.
+  function applyFetchedOrders(fetched: PurchaseOrder[]) {
+    const { orders: healed, changed } = healDuplicateOrderIds(fetched);
+    if (!changed) {
+      remoteUpdateRef.current = true;
+    }
+    setOrders(healed);
+  }
+
   // Initialize Auth & initial Sheet fetch
   useEffect(() => {
     initAuth();
@@ -187,8 +239,7 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (data && data.configured && Array.isArray(data.orders)) {
-            remoteUpdateRef.current = true;
-            setOrders(data.orders);
+            applyFetchedOrders(data.orders);
             setSheetSyncStatus('saved');
             setTimeout(() => setSheetSyncStatus('idle'), 3000);
             return;
@@ -216,8 +267,7 @@ export default function App() {
           fetchOrdersFromGoogleSheet(token, sheetId)
             .then((fetched) => {
               if (fetched) {
-                remoteUpdateRef.current = true;
-                setOrders(fetched);
+                applyFetchedOrders(fetched);
                 setSheetSyncStatus('saved');
                 setTimeout(() => setSheetSyncStatus('idle'), 3000);
               }
@@ -227,8 +277,7 @@ export default function App() {
           fetchPublicGoogleSheet(sheetId)
             .then((fetched) => {
               if (fetched) {
-                remoteUpdateRef.current = true;
-                setOrders(fetched);
+                applyFetchedOrders(fetched);
               }
             })
             .catch((err) => console.log('Public sheet auto fetch error:', err));
@@ -296,9 +345,16 @@ export default function App() {
         if (vercelRes.ok) {
           const data = await vercelRes.json();
           if (data && data.configured && Array.isArray(data.orders)) {
-            if (!syncLockRef.current && !areOrdersEquivalent(data.orders, ordersRef.current)) {
-              remoteUpdateRef.current = true;
-              setOrders(data.orders);
+            if (!syncLockRef.current) {
+              const { orders: healed, changed } = healDuplicateOrderIds(data.orders);
+              if (changed) {
+                // Duplicate/missing ids found in the sheet — heal them and
+                // save the corrected, unique ids straight back.
+                setOrders(healed);
+              } else if (!areOrdersEquivalent(healed, ordersRef.current)) {
+                remoteUpdateRef.current = true;
+                setOrders(healed);
+              }
             }
             return;
           }
@@ -318,9 +374,14 @@ export default function App() {
           ? await fetchOrdersFromGoogleSheet(token, sheetId)
           : await fetchPublicGoogleSheet(sheetId);
 
-        if (fetched && !syncLockRef.current && !areOrdersEquivalent(fetched, ordersRef.current)) {
-          remoteUpdateRef.current = true;
-          setOrders(fetched);
+        if (fetched && !syncLockRef.current) {
+          const { orders: healed, changed } = healDuplicateOrderIds(fetched);
+          if (changed) {
+            setOrders(healed);
+          } else if (!areOrdersEquivalent(healed, ordersRef.current)) {
+            remoteUpdateRef.current = true;
+            setOrders(healed);
+          }
         }
       } catch (err) {
         console.log('Background sheet poll error:', err);
@@ -369,12 +430,19 @@ export default function App() {
       setTimeout(() => setSheetSyncStatus('idle'), 3000);
     };
 
+    // Heal any duplicate/missing ids in the local list before writing it out,
+    // so we never re-push the corruption back into the sheet.
+    const { orders: ordersToSync, changed: healedLocally } = healDuplicateOrderIds(orders);
+    if (healedLocally) {
+      setOrders(ordersToSync);
+    }
+
     try {
       // 1. Save and fetch latest via Vercel Serverless API
       const saveRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'saveAll', orders }),
+        body: JSON.stringify({ action: 'saveAll', orders: ordersToSync }),
       });
 
       if (saveRes.ok) {
@@ -382,8 +450,7 @@ export default function App() {
         if (fetchRes.ok) {
           const data = await fetchRes.json();
           if (data && data.configured && Array.isArray(data.orders)) {
-            remoteUpdateRef.current = true;
-            setOrders(data.orders);
+            applyFetchedOrders(data.orders);
             await finishSync('saved');
             return;
           }
@@ -400,11 +467,10 @@ export default function App() {
           setStoredSpreadsheetId(sheetId);
         }
         if (sheetId) {
-          await saveOrdersToGoogleSheet(token, sheetId, orders);
+          await saveOrdersToGoogleSheet(token, sheetId, ordersToSync);
           const fetched = await fetchOrdersFromGoogleSheet(token, sheetId);
           if (fetched) {
-            remoteUpdateRef.current = true;
-            setOrders(fetched);
+            applyFetchedOrders(fetched);
           }
           await finishSync('saved');
           return;
@@ -412,8 +478,7 @@ export default function App() {
       } else if (sheetId) {
         const fetched = await fetchPublicGoogleSheet(sheetId);
         if (fetched) {
-          remoteUpdateRef.current = true;
-          setOrders(fetched);
+          applyFetchedOrders(fetched);
         }
         await finishSync('saved');
         return;
@@ -455,7 +520,7 @@ export default function App() {
       // Create new quote
       const qNum = orderData.quoteNumber || `QT-2026-${Math.floor(100 + Math.random() * 900)}`;
       const newQuote: PurchaseOrder = {
-        id: qNum,
+        id: generateUniqueOrderId(),
         quoteNumber: qNum,
         quoteDate: orderData.quoteDate || new Date().toISOString().slice(0, 10),
         expiryDate: orderData.expiryDate || undefined,
@@ -590,7 +655,8 @@ export default function App() {
   };
 
   const handleImportData = (importedOrders: PurchaseOrder[]) => {
-    setOrders(importedOrders);
+    const { orders: healed } = healDuplicateOrderIds(importedOrders);
+    setOrders(healed);
   };
 
   // Filtered Orders

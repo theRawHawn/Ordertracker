@@ -110,7 +110,7 @@ export async function fetchOrdersFromGoogleSheet(
   const data = await res.json();
   const rows: string[][] = data.values || [];
 
-  return rows.map((row) => {
+  return rows.map((row, rowIndex) => {
     const [
       id,
       quoteNumber,
@@ -128,7 +128,7 @@ export async function fetchOrdersFromGoogleSheet(
     ] = row;
 
     return {
-      id: id || quoteNumber || `QT-${Date.now()}`,
+      id: id || quoteNumber || `QT-${Date.now()}-${rowIndex}`,
       quoteNumber: quoteNumber || id || '',
       vendorName: vendorName || 'Unknown Vendor',
       quoteDate: quoteDate || new Date().toISOString().slice(0, 10),
