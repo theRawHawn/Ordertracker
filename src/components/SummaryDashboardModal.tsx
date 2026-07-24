@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PurchaseOrder } from '../types';
 import { formatINR } from '../utils/helpers';
 import {
@@ -13,6 +13,7 @@ import {
   Building2,
   ArrowRight,
   Filter,
+  Calendar,
 } from 'lucide-react';
 
 interface SummaryDashboardModalProps {
@@ -30,17 +31,46 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
   onSelectStatus,
   isReadOnly = false,
 }) => {
+  // Month filter ('ALL' or 'YYYY-MM', keyed off quote date / created date)
+  const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
+
   if (!isOpen) return null;
 
-  const totalCount = orders.length;
-  const totalAmount = orders.reduce((sum, o) => sum + o.amount, 0);
+  const getMonthKey = (order: PurchaseOrder): string | null => {
+    const raw = order.quoteDate || order.createdAt;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const monthLabel = (key: string): string => {
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const monthKeysSeen: Record<string, true> = {};
+  const availableMonths: string[] = [];
+  orders.forEach((o) => {
+    const key = getMonthKey(o);
+    if (key && !monthKeysSeen[key]) {
+      monthKeysSeen[key] = true;
+      availableMonths.push(key);
+    }
+  });
+  availableMonths.sort((a, b) => (a < b ? 1 : -1)); // newest first
+
+  const orders_ = selectedMonth === 'ALL' ? orders : orders.filter((o) => getMonthKey(o) === selectedMonth);
+
+  const totalCount = orders_.length;
+  const totalAmount = orders_.reduce((sum, o) => sum + o.amount, 0);
 
   // Group by status
-  const pendingOrders = orders.filter((o) => o.status === 'Pending');
-  const placedOrders = orders.filter((o) => o.status === 'Order Placed');
-  const deliveredOrders = orders.filter((o) => o.status === 'Delivered');
-  const holdOrders = orders.filter((o) => o.status === 'On Hold');
-  const cancelledOrders = orders.filter((o) => o.status === 'Cancelled');
+  const pendingOrders = orders_.filter((o) => o.status === 'Pending');
+  const placedOrders = orders_.filter((o) => o.status === 'Order Placed');
+  const deliveredOrders = orders_.filter((o) => o.status === 'Delivered');
+  const holdOrders = orders_.filter((o) => o.status === 'On Hold');
+  const cancelledOrders = orders_.filter((o) => o.status === 'Cancelled');
 
   const pendingAmount = pendingOrders.reduce((sum, o) => sum + o.amount, 0);
   const placedAmount = placedOrders.reduce((sum, o) => sum + o.amount, 0);
@@ -56,7 +86,7 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
 
   // Top Vendors aggregation
   const vendorMap: Record<string, { count: number; total: number }> = {};
-  orders.forEach((o) => {
+  orders_.forEach((o) => {
     if (!vendorMap[o.vendorName]) {
       vendorMap[o.vendorName] = { count: 0, total: 0 };
     }
@@ -86,19 +116,40 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
         </button>
 
         {/* Modal Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 p-0.5 shadow-md shrink-0">
-            <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center text-amber-400">
-              <PieChart className="w-6 h-6" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 p-0.5 shadow-md shrink-0">
+              <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center text-amber-400">
+                <PieChart className="w-6 h-6" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-white tracking-tight">
+                Order Summary & Dashboard
+              </h2>
+              <p className="text-xs text-slate-400">
+                Complete breakdown of quotes by status, volume, and total value
+              </p>
             </div>
           </div>
-          <div>
-            <h2 className="text-xl font-extrabold text-white tracking-tight">
-              Order Summary & Dashboard
-            </h2>
-            <p className="text-xs text-slate-400">
-              Complete breakdown of quotes by status, volume, and total value
-            </p>
+
+          {/* Month-wise Filter */}
+          <div className="relative shrink-0 sm:mr-8">
+            <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="pl-8 pr-8 py-2 bg-slate-800/90 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none"
+              title="Filter dashboard by month"
+            >
+              <option value="ALL">All Time</option>
+              {availableMonths.map((key) => (
+                <option key={key} value={key}>
+                  {monthLabel(key)}
+                </option>
+              ))}
+            </select>
+            <Filter className="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
@@ -106,7 +157,7 @@ export const SummaryDashboardModal: React.FC<SummaryDashboardModalProps> = ({
         <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Total Managed Quotes
+              {selectedMonth === 'ALL' ? 'Total Managed Quotes' : `Total for ${monthLabel(selectedMonth)}`}
             </span>
             <div className="text-2xl font-black text-amber-400 tracking-tight mt-0.5 font-mono">
               {isReadOnly ? '••••••' : formatINR(totalAmount)}
